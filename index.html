@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>どくしょ　ちょきんばこ</title>
+    <!-- 外部ライブラリの読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --app-bg: #FFFAF0;
+            --header-bg: #FFCCBC;
+            --header-gradient: linear-gradient(180deg, #FFCCBC 0%, #FFAB91 100%);
+            --border-color: #FFAB91;
+            --text-main: #D84315;
+            --tab-active-bg: #FF7043;
+            --tab-inactive-bg: #FFE0B2;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--app-bg);
+            color: #4E342E;
+            font-family: 'Zen Maru Gothic', sans-serif;
+            -webkit-text-size-adjust: 100%;
+            /* iOSでの長押しメニュー抑制 */
+            -webkit-touch-callout: none;
+        }
+
+        /* --- メインコンテナ --- */
+        .app-container {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100%;
+            height: 100%;
+            max-width: 420px;
+            margin: 0 auto;
+            background-color: white;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            padding-top: max(10px, env(safe-area-inset-top, 10px));
+            border-left: 1px solid #EEE;
+            border-right: 1px solid #EEE;
+        }
+
+        header {
+            background: var(--header-gradient);
+            padding: 0.35rem 0.75rem;
+            text-align: center;
+            flex-shrink: 0;
+            border-bottom: 2px solid var(--border-color);
+            box-shadow: 0 2px 10px rgba(216, 67, 21, 0.1);
+            position: relative;
+        }
+
+        .fancy-title {
+            font-size: 1.4rem;
+            color: var(--text-main);
+            font-weight: 900;
+            text-shadow: 2px 2px 0px white, -1px -1px 0px white, 1px -1px 0px white, -1px 1px 0px white, 3px 3px 5px rgba(216, 67, 21, 0.3);
+            letter-spacing: 0.05em;
+        }
+
+        .bounce-icon {
+            display: inline-block;
+            animation: welcome-bounce 1.2s ease-out 1;
+        }
+        @keyframes welcome-bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-8px) rotate(-5deg); }
+            60% { transform: translateY(-4px) rotate(5deg); }
+        }
+
+        /* --- ユーザー切り替えタブ --- */
+        .user-tabs {
+            display: flex;
+            background: #FFF3E0;
+            padding: 4px;
+            gap: 4px;
+            border-bottom: 2px solid #FFCCBC;
+            flex-shrink: 0;
+        }
+        .user-tab-btn {
+            flex: 1;
+            padding: 6px 1px; /* 左右のパディングを少し減らして文字数確保 */
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 900;
+            text-align: center;
+            color: #8D6E63;
+            background: var(--tab-inactive-bg);
+            transition: all 0.2s;
+            border: 2px solid transparent;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            /* 長押しでのテキスト選択を防ぐ */
+            user-select: none;
+            -webkit-user-select: none;
+            cursor: pointer;
+        }
+        .user-tab-btn.active {
+            background: #fff;
+            color: #D84315;
+            border-color: #FF7043;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transform: translateY(-1px);
+        }
+
+        /* --- タブコンテンツ --- */
+        .tab-content { display: none; height: 100%; overflow: hidden; }
+        .tab-content.active { display: flex; flex-direction: column; }
+        #tab-log, #tab-stamp { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+        /* ホーム画面レイアウト */
+        #tab-home.active { 
+            justify-content: stretch; 
+            padding: 0;
+            overflow-y: hidden;
+            gap: 0;
+            flex-direction: column;
+        }
+
+        .section-half {
+            display: flex;
+            flex-direction: column;
+            padding: 0.35rem;
+            box-sizing: border-box;
+            overflow: hidden;
+            width: 100%;
+        }
+        .section-half:first-child { height: 50%; min-height: 0; flex-shrink: 0; }
+        .section-half:last-child { height: 50%; min-height: 0; flex: 1; }
+
+        /* --- 貯金箱エリア --- */
+        .chokin-card {
+            background-color: #FFF3E0;
+            border-radius: 1rem;
+            border: 2px solid #FFB74D;
+            padding: 0.4rem;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        .chokin-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .chokin-box {
+            flex: 1;
+            background-color: white;
+            border-radius: 0.7rem;
+            border: 2.5px solid #FFB74D;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 0;
+            padding: 0 12px;
+            overflow: hidden;
+        }
+
+        .chokin-label { 
+            font-size: clamp(12px, 2.2vh, 15px); font-weight: 900; color: #5D4037; 
+            line-height: 1.1; margin: 0; white-space: nowrap;
+        }
+        .chokin-value-row { display: flex; align-items: baseline; gap: 3px; margin: 0; }
+        .chokin-value { font-size: clamp(20px, 4vh, 40px); font-weight: 900; color: #E64A19; line-height: 1; }
+        .chokin-unit { font-size: clamp(11px, 1.6vh, 16px); font-weight: 900; color: #8D6E63; }
+
+        .home-action-buttons {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: row;
+            gap: 2px;
+            margin-top: 0.3rem;
+            width: 100%;
+        }
+
+        .btn-clear {
+            display: flex; align-items: center; justify-content: center; gap: 1px;
+            border-radius: 0.5rem; font-weight: 900; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.1s;
+            white-space: nowrap;
+        }
+        .btn-clear:active { transform: scale(0.97); }
+
+        /* --- カメラエリア --- */
+        #interactive.viewport {
+            position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden;
+            border-radius: 0.8rem; background-color: #E3F2FD; display: flex;
+            justify-content: center; align-items: center; border: 2px solid #FFF; box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+        #interactive.viewport video { position: absolute; width: 100% !important; height: 100% !important; object-fit: cover; z-index: 10; }
+        #scanner-cover { position: absolute; inset: 0; background-color: #E1F5FE; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 5; }
+        #success-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
+
+        .scan-frame {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 80%; height: 60%; z-index: 30; pointer-events: none;
+        }
+        .scan-corner { position: absolute; width: 10px; height: 10px; border-color: #FF5252; border-style: solid; border-width: 0; }
+        .tl { top: 0; left: 0; border-top-width: 3px; border-left-width: 3px; border-radius: 3px 0 0 0; }
+        .tr { top: 0; right: 0; border-top-width: 3px; border-right-width: 3px; border-radius: 0 3px 0 0; }
+        .bl { bottom: 0; left: 0; border-bottom-width: 3px; border-left-width: 3px; border-radius: 0 0 0 3px; }
+        .br { bottom: 0; right: 0; border-bottom-width: 3px; border-right-width: 3px; border-radius: 0 0 3px 0; }
+        
+        .scan-line {
+            position: absolute; top: 50%; left: 0; width: 100%; height: 2px;
+            background-color: #FF1744; box-shadow: 0 0 4px #FF1744; z-index: 31;
+            animation: scan-move 2s infinite ease-in-out;
+        }
+        @keyframes scan-move { 0% { top: 20%; opacity: 0.3; } 50% { top: 50%; opacity: 1; } 100% { top: 80%; opacity: 0.3; } }
+
+        .nav-btn.active { color: #FF7043; background: #FFF0F0; border-top: 4px solid #FF7043; }
+
+        /* --- 共通・リスト・スタンプ --- */
+        .unified-header-row {
+            display: flex; align-items: center; justify-content: space-between; gap: 0.4rem;
+            padding: 0.3rem 0.6rem; background: white; border-radius: 0.8rem; border: 2px solid #FFCCBC;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); flex-wrap: nowrap; white-space: nowrap; flex-shrink: 0;
+        }
+        .unified-summary-box { display: flex; align-items: center; gap: 2px; padding-left: 0.4rem; border-left: 2px solid #FFAB91; }
+        .list-guide-msg {
+            background-color: #FFF9C4; color: #795548; font-size: 10px; font-weight: 900;
+            text-align: center; padding: 4px; border-radius: 6px; margin-top: 4px; border: 1px dashed #FFD54F;
+        }
+        .date-selectors { display: flex; gap: 0.2rem; align-items: center; flex-wrap: nowrap; justify-content: center; }
+        select {
+            appearance: none; background-color: white; border: 2px solid #FFAB91; border-radius: 6px;
+            padding: 1px 6px; font-weight: bold; color: #D84315; font-size: 12px; outline: none; cursor: pointer;
+        }
+        .goal-input {
+            width: 38px; text-align: center; font-weight: 900; color: #FF7043; font-size: 1rem;
+            background: #FFF; border: 2px solid #FFAB91; border-radius: 6px; outline: none; padding: 1px 0;
+        }
+        .stamp-grid {
+            display: grid; 
+            grid-template-columns: repeat(5, 1fr); /* 6列から5列に変更 */
+            gap: 5px; /* 隙間を少し広く */
+            background-color: white; padding: 6px; border-radius: 0.7rem; border: 2px solid #FFCCBC;
+        }
+        .stamp-cell {
+            aspect-ratio: 1; border: 1px dashed #FFCCBC; border-radius: 0.4rem;
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 42px; /* スタンプを大きく */
+            line-height: 1;
+            background-color: #FFFAF0; overflow: hidden;
+        }
+        .stamp-cell.filled { border-style: solid; background-color: #FFF0F0; animation: stamp-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .section-title-top { font-size: 0.8rem; font-weight: 900; color: #E65100; }
+        .current-date-title { font-size: 1.05rem; font-weight: 900; color: #D84315; margin: 0; text-align: center; }
+
+        /* 通知メッセージ */
+        #notice-msg {
+            position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(200%);
+            background: rgba(62, 39, 35, 0.95); color: white;
+            padding: 12px 24px; font-size: 14px; text-align: center; font-weight: bold;
+            z-index: 10000; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border-radius: 2rem; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            width: auto; min-width: 200px;
+            opacity: 0; visibility: hidden; pointer-events: none;
+        }
+        #notice-msg.show { transform: translateX(-50%) translateY(0); opacity: 1; visibility: visible; }
+        
+        .input-error { border-color: #EF4444 !important; background-color: #FEF2F2 !important; box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.3); }
+
+        #load-error-msg {
+            position: fixed; inset: 0; background: white; z-index: 99999;
+            display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;
+        }
+
+        .progress-gold {
+            background: linear-gradient(to right, #FFD700, #FDB931) !important;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+    <div id="load-error-msg">
+        <p class="text-4xl mb-4">😢</p>
+        <h2 class="text-xl font-bold text-red-500 mb-2">プログラムが よみこめませんでした</h2>
+        <p class="text-sm text-gray-600">インターネットに つながっているか<br>かくにん してください。</p>
+        <button onclick="location.reload()" class="mt-6 px-6 py-3 bg-blue-500 text-white rounded-xl font-bold shadow-md">もういちど やってみる</button>
+    </div>
+
+    <div class="app-container">
+        <header>
+            <div class="flex items-center justify-center relative">
+                <h1 class="fancy-title flex items-center justify-center gap-2 leading-none">
+                    <span class="text-3xl bounce-icon">📖</span> どくしょ　ちょきんばこ
+                </h1>
+                <button onclick="openSettings()" class="absolute right-0 top-1/2 -translate-y-1/2 text-lg p-1 bg-white/50 rounded-full">⚙️</button>
+            </div>
+        </header>
+
+        <!-- ユーザー切り替えタブ -->
+        <div class="user-tabs" id="user-tabs-container">
+            <!-- JavaScriptで生成されます -->
+        </div>
+
+        <!-- 【ホーム】 -->
+        <main id="tab-home" class="tab-content active flex-1">
+            <div class="section-half">
+                <div class="chokin-card">
+                    <div class="flex flex-col mb-1 shrink-0 px-1 gap-1">
+                        <h3 class="section-title-top text-center"><span id="home-user-name-display">わたし</span> の ちょきん</h3>
+                        <div class="flex justify-between items-center bg-orange-50 rounded-lg p-1 border border-orange-100">
+                            <!-- 集計期間選択プルダウン -->
+                            <select id="filter-period" onchange="renderChokinBako()" class="text-xs font-bold text-[#D84315] bg-transparent outline-none border-b border-[#FFAB91] py-0.5 cursor-pointer flex-1 mr-2">
+                                <option value="year" selected>ことしのデータ(4月〜)</option>
+                                <option value="all">ぜんぶのデータ</option>
+                                <option value="month">こんげつのデータ</option>
+                            </select>
+                            <div class="flex gap-1 shrink-0">
+                                <button onclick="showHelp()" class="px-2 py-0.5 bg-white border border-[#4FC3F7] rounded-full text-[8px] font-black text-[#0288D1] active:scale-95 shadow-sm whitespace-nowrap">❓ つかいかた</button>
+                                <button onclick="showResetConfirm()" class="px-2 py-0.5 bg-white border border-red-400 rounded-full text-[8px] font-black text-red-500 active:scale-95 shadow-sm whitespace-nowrap">♻️ リセット</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chokin-grid">
+                        <div class="chokin-box">
+                            <span class="chokin-label">本のかず</span>
+                            <div class="chokin-value-row">
+                                <span class="chokin-value" id="total-books-count">0</span>
+                                <span class="chokin-unit">さつ</span>
+                            </div>
+                        </div>
+                        <div class="chokin-box">
+                            <span class="chokin-label">ページのごうけい</span>
+                            <div class="chokin-value-row">
+                                <span class="chokin-value" id="total-pages-count">0</span>
+                                <span class="chokin-unit">ページ</span>
+                            </div>
+                        </div>
+                        <div class="chokin-box">
+                            <span class="chokin-label">ごうけいきんがく</span>
+                            <div class="chokin-value-row">
+                                <span class="chokin-value" id="total-price-count">0</span>
+                                <span class="chokin-unit">えん</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="home-action-buttons">
+                        <button id="btn-copy" onclick="copyForSpreadsheet()" class="btn-clear flex-1 py-1.5 bg-[#4CAF50] text-white text-xs font-black tracking-tighter border-b-2 border-[#2E7D32]">
+                            ひょうにコピー
+                        </button>
+                        <button onclick="saveDataFile()" class="btn-clear flex-1 py-1.5 bg-[#42A5F5] text-white text-xs font-black tracking-tighter border-b-2 border-[#1E88E5]">
+                            データをほぞん
+                        </button>
+                        <div class="btn-clear flex-1 py-1.5 bg-[#9575CD] text-white text-xs font-black tracking-tighter border-b-2 border-[#7E57C2] relative text-center flex items-center justify-center cursor-pointer">
+                            データをもどす
+                            <input type="file" id="file-input" accept=".json" onchange="loadDataFile(this)" 
+                                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 50;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-half">
+                <div class="bg-[#E1F5FE] rounded-[1rem] p-2 border-2 border-solid border-[#4FC3F7] flex flex-col relative flex-1 min-h-0">
+                    <div class="flex w-full justify-between items-center mb-1 shrink-0">
+                        <p class="text-[0.8rem] font-black text-[#0288D1]">バーコードよみとりカメラ</p>
+                    </div>
+
+                    <div id="interactive" class="viewport shadow-sm relative flex-1">
+                        <!-- カメラ切り替えボタン -->
+                        <button onclick="switchCamera()" id="cam-switch-btn" class="absolute top-2 right-2 z-50 bg-white/80 p-2 rounded-full shadow text-xl hidden active:scale-90 transition-transform text-blue-500 border border-blue-200">🔄</button>
+                        
+                        <div id="scanner-cover">
+                            <svg class="w-8 h-8 text-blue-300" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M4 4h3l2-2h6l2 2h3a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2zm10 7a2 2 0 10-4 0 2 2 0 004 0zm2 0a4 4 0 11-8 0 4 4 0 018 0z"/>
+                            </svg>
+                        </div>
+                        <div id="guide-box" class="scan-frame hidden">
+                            <div class="scan-corner tl"></div><div class="scan-corner tr"></div>
+                            <div class="scan-corner bl"></div><div class="scan-corner br"></div>
+                            <div class="scan-line"></div>
+                        </div>
+                        <div id="success-overlay">
+                            <div class="text-3xl animate-bounce">✅</div>
+                            <p class="font-bold text-blue-600 text-xs">よめました！</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex w-full gap-2 mt-2 shrink-0">
+                        <button onclick="toggleScanner()" class="flex-[1] h-11 bg-[#29B6F6] hover:bg-[#039BE5] text-white rounded-[0.8rem] font-black shadow border-b-4 border-[#0277BD] flex flex-col items-center justify-center leading-tight">
+                            <span id="btn-text" class="text-[13px]">カメラでバーコードをよむ</span>
+                        </button>
+                        <button onclick="showManualModal('')" class="flex-[1] h-11 bg-white border-2 border-[#29B6F6] text-[#0277BD] rounded-[0.8rem] flex flex-col items-center justify-center active:scale-95 min-w-[65px] shadow-sm leading-tight">
+                            <span class="text-[13px] font-black">本のばんごうをいれる</span>
+                        </button>
+                    </div>
+                    <p class="text-[10px] text-gray-400 text-center mt-2 font-bold shrink-0">
+                        ©2026　どくしょ　ちょきんばこ　ＩＣＴ支援の杜
+                    </p>
+                </div>
+            </div>
+        </main>
+
+        <!-- 【リスト】 -->
+        <main id="tab-log" class="tab-content flex-1 p-3 gap-1 no-scrollbar overflow-y-auto">
+            <div class="unified-header-row shrink-0">
+                <div class="date-selectors">
+                    <select id="year-selector-log" onchange="syncDateAndRender(this.value, 'year')"></select>
+                    <select id="month-selector-log" onchange="syncDateAndRender(this.value, 'month')"></select>
+                </div>
+                <div class="flex items-center gap-1">
+                    <div class="unified-summary-box">
+                        <span class="text-[8px] font-black text-gray-400">こんげつ:</span>
+                        <span class="text-base font-black text-[#E64A19]"><span id="log-monthly-books">0</span><span class="text-[10px] ml-0.5">さつ</span></span>
+                    </div>
+                    <!-- リスト画面用のヘルプボタン -->
+                    <button onclick="showListHelp()" class="px-2 py-0.5 bg-white border border-[#FFAB91] rounded-full text-[8px] font-black text-[#D84315] active:scale-95 shadow-sm whitespace-nowrap">❓</button>
+                </div>
+            </div>
+            <div id="log-month-header" class="current-date-title"></div>
+            <div id="book-list" class="space-y-1 mt-1 pb-4"></div>
+        </main>
+
+        <!-- 【スタンプ】 -->
+        <main id="tab-stamp" class="tab-content flex-1 p-3 gap-1 no-scrollbar overflow-y-auto">
+            <div class="unified-header-row shrink-0">
+                <div class="date-selectors">
+                    <select id="year-selector-stamp" onchange="syncDateAndRender(this.value, 'year')"></select>
+                    <select id="month-selector-stamp" onchange="syncDateAndRender(this.value, 'month')"></select>
+                </div>
+                <div class="flex items-center gap-1 border-l-2 border-orange-100 pl-2">
+                    <span class="font-black text-[10px] text-[#5D4037]">もくひょう:</span>
+                    <input type="number" id="target-goal-input" class="goal-input" value="10" onchange="updateGoal(this.value)">
+                    <span class="text-[10px] font-black text-[#8D6E63]">さつ</span>
+                </div>
+            </div>
+            <!-- スタンプ月表示とプルダウンのレイアウト調整 -->
+            <div class="relative flex items-center justify-center mt-2 mb-1 px-2">
+                <div id="stamp-month-header" class="current-date-title m-0"></div>
+                <div class="absolute right-2">
+                    <select id="stamp-type-select" onchange="saveStampSetting(this.value)" class="text-xl bg-transparent border-b-2 border-orange-200 outline-none cursor-pointer appearance-none px-1">
+                        <!-- JSでオプションを生成 -->
+                    </select>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl p-2 border-2 border-[#FFCCBC] shadow-sm mt-1">
+                <div class="flex justify-between items-center mb-1 px-1">
+                    <h2 class="font-black text-sm text-[#D84315]" id="stamp-month-title">スタンプ帳</h2>
+                    <span class="text-[10px] font-black text-gray-400" id="stamp-count-text">0 / 10</span>
+                </div>
+                <div class="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden border border-gray-200 mb-2">
+                    <div id="goal-progress" class="bg-gradient-to-r from-[#FFAB91] to-[#FF7043] h-full transition-all duration-700" style="width: 0%"></div>
+                </div>
+                <div id="goal-markers" class="flex justify-between text-[9px] text-[#8D6E63] font-black px-1 mb-2"></div>
+                <div id="stamp-grid" class="stamp-grid"></div>
+            </div>
+        </main>
+
+        <!-- ナビゲーション -->
+        <nav class="bg-white border-t-2 border-[#FFCCBC] h-14 shrink-0 flex items-center justify-around pb-1">
+            <button onclick="switchTab('home')" id="nav-home" class="nav-btn active flex-1 flex flex-col items-center justify-center h-full">
+                <span class="text-xl">🏠</span><span class="text-[9px] font-black">ホーム</span>
+            </button>
+            <button onclick="switchTab('log')" id="nav-log" class="nav-btn flex-1 flex flex-col items-center justify-center h-full">
+                <span class="text-xl">📚</span><span class="text-[9px] font-black">リスト</span>
+            </button>
+            <button onclick="switchTab('stamp')" id="nav-stamp" class="nav-btn flex-1 flex flex-col items-center justify-center h-full">
+                <span class="text-xl">💮</span><span class="text-[9px] font-black">スタンプ</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- 設定モーダル（名前変更） -->
+    <div id="settings-modal" class="fixed inset-0 hidden flex items-center justify-center p-4 z-[700] bg-black/80 text-left">
+        <div class="bg-white w-full max-w-sm rounded-[1.5rem] p-6 border-4 border-orange-200 shadow-2xl">
+            <h3 class="text-xl font-black text-[#D84315] mb-4 text-center">⚙️ なまえのへんこう</h3>
+            <div class="space-y-4 mb-6">
+                <div>
+                    <label class="text-xs font-bold text-gray-500">1人め (8もじまで)</label>
+                    <input type="text" id="setting-name-1" maxlength="8" class="w-full p-2 bg-gray-50 border border-gray-300 rounded-lg font-black text-lg text-center" placeholder="わたし">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500">2人め (8もじまで)</label>
+                    <input type="text" id="setting-name-2" maxlength="8" class="w-full p-2 bg-gray-50 border border-gray-300 rounded-lg font-black text-lg text-center" placeholder="かぞくB">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500">3人め (8もじまで)</label>
+                    <input type="text" id="setting-name-3" maxlength="8" class="w-full p-2 bg-gray-50 border border-gray-300 rounded-lg font-black text-lg text-center" placeholder="かぞくC">
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="document.getElementById('settings-modal').classList.add('hidden')" class="flex-1 py-3 text-gray-500 font-black text-lg bg-gray-100 rounded-xl">キャンセル</button>
+                <button onclick="saveSettings()" class="flex-1 py-3 bg-[#FF7043] text-white rounded-xl font-black text-lg shadow active:scale-95 border-b-4 border-[#E64A19]">けってい</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- モーダル・確認画面 -->
+    <div id="reset-confirm-modal" class="fixed inset-0 hidden flex items-center justify-center p-4 z-[700] bg-black/80 text-left">
+        <div class="bg-white w-full max-w-sm rounded-[1.5rem] p-6 border-4 border-red-200 shadow-2xl text-center">
+            <p class="text-4xl mb-4">⚠️</p>
+            <h3 class="text-xl font-black text-red-600 mb-4 leading-relaxed">いまみている人のデータを<br>ぜんぶけします<br>ほんとうにいいですか</h3>
+            <div class="flex gap-3">
+                <button onclick="hideResetConfirm()" class="flex-1 py-3 bg-gray-100 text-gray-500 rounded-xl font-black text-lg shadow active:scale-95">やめる</button>
+                <button onclick="resetAllDataActual()" class="flex-1 py-3 bg-red-500 text-white rounded-xl font-black text-lg shadow active:scale-95 border-b-4 border-red-700">けす！</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 目標達成のお祝いモーダル -->
+    <div id="goal-achieved-modal" class="fixed inset-0 hidden flex items-center justify-center p-4 z-[800] bg-black/80 text-center">
+        <div class="bg-white w-full max-w-sm rounded-[2rem] p-8 border-4 border-yellow-400 shadow-2xl animate-bounce">
+            <p class="text-6xl mb-4">🎊</p>
+            <h3 class="text-2xl font-black text-orange-500 mb-2">おめでとう！</h3>
+            <p class="text-lg font-bold text-gray-700">こんげつの もくひょう<br>たっせい！</p>
+            <button onclick="document.getElementById('goal-achieved-modal').classList.add('hidden')" class="mt-6 px-8 py-3 bg-yellow-400 text-white rounded-xl font-black text-xl shadow-lg border-b-4 border-yellow-600 active:scale-95">やったね！</button>
+        </div>
+    </div>
+
+    <div id="help-modal" class="fixed inset-0 hidden flex items-center justify-center p-4 z-[600] bg-black/70 text-left">
+        <div class="bg-white w-full max-w-sm rounded-[1.2rem] p-5 border-4 border-[#FFCCBC] flex flex-col shadow-2xl overflow-hidden text-left max-h-[80vh]">
+            <h3 class="text-xl font-black text-[#D84315] mb-3 text-center">📕 つかいかた</h3>
+            <div class="flex-1 space-y-3 text-sm font-bold text-[#5D4037] overflow-y-auto no-scrollbar py-1 text-left">
+                
+                <div class="bg-[#E1F5FE] p-2.5 rounded-xl border border-[#4FC3F7]">
+                    <p class="text-blue-600 mb-0.5 font-black text-sm">📸 バーコードを よむ</p>
+                    <p class="text-[11px] font-medium leading-relaxed">本の うしろの バーコードに 赤い 線を あわせてね。</p>
+                </div>
+
+                <div class="bg-orange-50 p-2.5 rounded-xl border border-orange-200">
+                    <p class="text-[#E65100] mb-0.5 font-black text-sm">🏷️ なまえを かえる</p>
+                    <p class="text-[11px] font-medium leading-relaxed">
+                        上の なまえの ボタンを <span class="text-red-500 font-bold">ながおし</span> すると、なまえを かえられるよ。(8もじ まで)<br>
+                        ※パソコンなら 2かい おしてね
+                    </p>
+                </div>
+
+                <div class="bg-orange-50 p-2.5 rounded-xl border border-orange-200">
+                    <p class="text-[#E65100] mb-0.5 font-black text-sm">📅 いつの きろく</p>
+                    <p class="text-[11px] font-medium leading-relaxed">
+                        「ぜんぶ」「ことし(4月から)」「こんげつ」を えらんで、いつから いつまでの きろくを みるか かえられるよ。
+                    </p>
+                </div>
+
+                <div class="bg-[#D1C4E9] p-2.5 rounded-xl border border-[#9575CD]">
+                    <p class="text-[#4527A0] mb-0.5 font-black text-sm">💾 きろくの コピーと ほぞん</p>
+                    <ul class="list-disc pl-4 text-[10px] space-y-1 mt-1">
+                        <li><b>ひょうにコピー</b>: パソコンの エクセルなどに はれるように コピーするよ。</li>
+                        <li><b>データをほぞん</b>: きろくを ファイルとして ほぞん するよ。だいじな きろくを なくさないように しよう！</li>
+                        <li><b>データをもどす</b>: ほぞんした ファイルを よみこんで、きろくを もとにもどすよ。</li>
+                    </ul>
+                </div>
+
+                <div class="bg-[#FFF9C4] p-2.5 rounded-xl border border-[#FFF176]">
+                    <p class="text-yellow-700 mb-0.5 font-black text-sm">❌ きろくを けす</p>
+                    <p class="text-[11px] font-medium leading-relaxed">リストの がめんで「❌」を おすと、まちがえた きろくを けせるよ。</p>
+                </div>
+            </div>
+            <button onclick="hideHelp()" class="mt-4 w-full py-3 bg-[#FF7043] text-white rounded-xl font-black text-lg shadow active:scale-95 border-b-4 border-[#E64A19]">わかった！</button>
+        </div>
+    </div>
+
+    <!-- リスト専用ヘルプモーダル（新規追加） -->
+    <div id="list-help-modal" class="fixed inset-0 hidden flex items-center justify-center p-4 z-[600] bg-black/70 text-left">
+        <div class="bg-white w-full max-w-sm rounded-[1.2rem] p-5 border-4 border-[#FFAB91] flex flex-col shadow-2xl overflow-hidden text-left">
+            <h3 class="text-xl font-black text-[#D84315] mb-3 text-center">📚 リストの つかいかた</h3>
+            <div class="flex-1 space-y-3 text-sm font-bold text-[#5D4037] overflow-y-auto no-scrollbar py-1 text-left">
+                
+                <div class="bg-yellow-50 p-2.5 rounded-xl border border-yellow-200 flex gap-2 items-center">
+                    <span class="text-2xl">★</span>
+                    <div>
+                        <p class="text-[#F57F17] font-black text-sm">ほしを おす</p>
+                        <p class="text-[11px]">おもしろかったか きめられるよ。</p>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 p-2.5 rounded-xl border border-blue-200 flex gap-2 items-center">
+                    <span class="text-2xl">🎤</span>
+                    <div>
+                        <p class="text-[#0288D1] font-black text-sm">マイク ボタン</p>
+                        <p class="text-[11px]">こえで かんそうが いれられるよ。<br>（ボタンを おして はなしてね）</p>
+                    </div>
+                </div>
+
+                <div class="bg-red-50 p-2.5 rounded-xl border border-red-200 flex gap-2 items-center">
+                    <span class="text-2xl">❌</span>
+                    <div>
+                        <p class="text-[#D32F2F] font-black text-sm">× ボタン</p>
+                        <p class="text-[11px]">まちがえた きろくを けせるよ。</p>
+                    </div>
+                </div>
+
+            </div>
+            <button onclick="hideListHelp()" class="mt-4 w-full py-3 bg-[#FF7043] text-white rounded-xl font-black text-lg shadow active:scale-95 border-b-4 border-[#E64A19]">わかった！</button>
+        </div>
+    </div>
+
+    <!-- 検索モーダル (スマホ最適化済み) -->
+    <div id="modal-overlay" class="fixed inset-0 hidden flex items-center justify-center p-2 z-[500] bg-black/60 text-left">
+        <div class="bg-white w-[95%] max-w-md rounded-[1.5rem] p-4 border-4 border-[#4FC3F7] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <h3 class="text-lg font-black text-[#0288D1] mb-2 text-center text-left">🔎 本のばんごうで さがす</h3>
+            <div class="flex-1 overflow-y-auto space-y-4 pt-1 px-1 no-scrollbar text-left text-left text-left">
+                <div class="p-4 bg-blue-50 rounded-xl border-2 border-blue-200 text-left">
+                    <label class="text-xs font-black text-[#0277BD]">978ではじまるすうじをいれてください</label>
+                    <div class="flex gap-2 mt-1 items-stretch">
+                        <input type="text" id="input-isbn" placeholder="978..." class="flex-1 min-w-0 p-2 bg-white border-2 border-blue-200 rounded-lg outline-none text-[24px] font-black">
+                        <button onclick="lookupISBNFromInput()" class="shrink-0 px-4 bg-[#29B6F6] text-white rounded-lg font-black text-sm border-b-2 border-[#0277BD] active:scale-95 whitespace-nowrap">さがす</button>
+                    </div>
+                </div>
+                <div id="search-candidates"></div>
+                <div class="border-t-2 border-dashed border-gray-200 pt-4 text-left">
+                    <label class="text-[10px] font-black text-gray-400">本の なまえ</label>
+                    <input type="text" id="input-title" class="w-full p-2 bg-gray-50 border border-gray-300 rounded-lg mb-2 text-base font-black">
+                    <label class="text-[10px] font-black text-gray-400">かいた ひと</label>
+                    <input type="text" id="input-author" class="w-full p-2 bg-gray-50 border border-gray-300 rounded-lg mb-2 text-base font-black">
+                    <div class="flex gap-3">
+                        <div class="flex-1">
+                            <label class="text-[10px] font-black text-gray-400">ページ</label>
+                            <input type="number" id="input-pages" class="w-full p-2 bg-gray-50 border border-gray-300 rounded-lg text-base font-black">
+                        </div>
+                        <div class="flex-1">
+                            <label class="text-[10px] font-black text-gray-400">ねだん</label>
+                            <input type="number" id="input-price" class="w-full p-2 bg-gray-50 border border-gray-300 rounded-lg text-base font-black">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <p class="text-[10px] font-bold text-center text-gray-500 mt-2 mb-1">だれのリストに いれますか？</p>
+            <div id="record-buttons-container" class="flex flex-row gap-2 pt-2 border-t-2 mt-0 shrink-0 text-left">
+                <!-- JSでボタンを生成 -->
+            </div>
+            <button onclick="hideManualModal()" class="mt-2 w-full py-2 text-gray-400 font-bold text-sm hover:bg-gray-100 rounded-lg">やめる</button>
+        </div>
+    </div>
+
+    <div id="celebration" class="fixed inset-0 pointer-events-none z-[1000] flex items-center justify-center hidden">
+        <div class="bg-white/95 p-10 rounded-[3rem] shadow-2xl text-center border-4 border-[#FF7043] animate-bounce text-left">
+            <p class="text-7xl mb-4">🎉</p>
+            <h2 class="text-xl font-black text-[#FF5722] text-left">きろく したよ！</h2>
+        </div>
+    </div>
+
+    <div id="notice-msg"></div>
+
+    <script>
+        const STORAGE_KEY_LOGS = 'reading_record_main_v1_logs';
+        const STORAGE_KEY_GOALS = 'reading_record_main_v1_goals';
+        const STORAGE_KEY_USER_NAMES = 'reading_record_user_names';
+        const STORAGE_KEY_STAMP_SETTINGS = 'reading_record_stamp_settings';
+        
+        let logs = [];
+        let goals = {};
+        let userNames = { 1: "わたし", 2: "かぞくB", 3: "かぞくC" };
+        let stampSettings = {};
+        let currentUserId = 1; 
+        
+        try {
+            logs = JSON.parse(localStorage.getItem(STORAGE_KEY_LOGS)) || [];
+            goals = JSON.parse(localStorage.getItem(STORAGE_KEY_GOALS)) || {};
+            const savedNames = JSON.parse(localStorage.getItem(STORAGE_KEY_USER_NAMES));
+            if (savedNames) userNames = savedNames;
+            const savedStamps = JSON.parse(localStorage.getItem(STORAGE_KEY_STAMP_SETTINGS));
+            if (savedStamps) stampSettings = savedStamps;
+
+            let hasLegacyData = false;
+            logs.forEach(log => {
+                if (!log.ownerId) {
+                    log.ownerId = 1;
+                    hasLegacyData = true;
+                }
+            });
+            if (hasLegacyData) {
+                localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(logs));
+            }
+
+        } catch(e) {
+            console.error("Storage load error", e);
+            logs = [];
+            goals = {};
+        }
+
+        let isScannerRunning = false, isProcessingBarcode = false;
+        let selectedYear = new Date().getFullYear(), selectedMonth = new Date().getMonth() + 1;
+        let audioCtx = null;
+        let currentFacingMode = "environment";
+
+        const STAMP_OPTIONS = {
+            1: ["🎍", "🌅", "🧧"],
+            2: ["👹", "🍫", "❄️"],
+            3: ["🎎", "🌸", "🍡"],
+            4: ["🎒", "🌷", "🏫"],
+            5: ["🎏", "🍀", "🍓"],
+            6: ["☔", "🐸", "🐌"],
+            7: ["🎋", "🌌", "🍦"],
+            8: ["🌻", "🎆", "🌊"],
+            9: ["🎑", "🐇", "🍇"],
+            10: ["🎃", "👻", "🍬"],
+            11: ["🍁", "🍄", "📚"],
+            12: ["🎄", "🎅", "🎁"]
+        };
+
+        function playFanfare() {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                
+                const t = audioCtx.currentTime;
+                const playTone = (freq, time, dur) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(freq, time);
+                    gain.gain.setValueAtTime(0, time);
+                    gain.gain.linearRampToValueAtTime(0.08, time + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(time);
+                    osc.stop(time + dur);
+                };
+                playTone(392.00, t, 0.15);       
+                playTone(523.25, t + 0.15, 0.15);
+                playTone(659.25, t + 0.30, 0.15); 
+                playTone(783.99, t + 0.45, 0.15);
+                playTone(1046.50, t + 0.60, 0.6); 
+                playTone(523.25, t + 0.60, 0.6);  
+            } catch(e) {}
+        }
+
+        function playStartSound() {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const t = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, t);
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(0.1, t + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(t); osc.stop(t + 0.3);
+            } catch(e) {}
+        }
+
+        window.onload = () => { 
+            try {
+                initDateSelectors(); 
+                renderUserTabs();
+                renderAll();
+            } catch(e) { console.error("Window onload error", e); }
+        };
+
+        // --- ユーザー管理 ---
+        function switchUser(userId) {
+            currentUserId = userId;
+            renderUserTabs();
+            renderAll();
+        }
+
+        function renderUserTabs() {
+            const container = document.getElementById('user-tabs-container');
+            if(!container) return;
+            container.innerHTML = [1, 2, 3].map(id => `
+                <button 
+                    onclick="switchUser(${id})" 
+                    ondblclick="openSettings()" 
+                    oncontextmenu="openSettings(); return false;"
+                    class="user-tab-btn ${currentUserId === id ? 'active' : ''}"
+                >
+                    ${userNames[id]}
+                </button>
+            `).join('');
+            
+            // ホーム画面の名前表示
+            const homeName = document.getElementById('home-user-name-display');
+            if(homeName) {
+                homeName.innerText = userNames[currentUserId];
+            }
+        }
+
+        function openSettings() {
+            document.getElementById('setting-name-1').value = userNames[1];
+            document.getElementById('setting-name-2').value = userNames[2];
+            document.getElementById('setting-name-3').value = userNames[3];
+            document.getElementById('settings-modal').classList.remove('hidden');
+        }
+
+        function saveSettings() {
+            userNames[1] = document.getElementById('setting-name-1').value.trim() || "わたし";
+            userNames[2] = document.getElementById('setting-name-2').value.trim() || "かぞくB";
+            userNames[3] = document.getElementById('setting-name-3').value.trim() || "かぞくC";
+            localStorage.setItem(STORAGE_KEY_USER_NAMES, JSON.stringify(userNames));
+            renderUserTabs();
+            // 記録ボタンの表示名も更新されるように再描画が必要ならここで行う
+            document.getElementById('settings-modal').classList.add('hidden');
+            showNotice("なまえを かえました");
+        }
+
+        // --- レンダリング関連 ---
+        function initDateSelectors() {
+            const yLog = document.getElementById('year-selector-log'), yStamp = document.getElementById('year-selector-stamp');
+            const mLog = document.getElementById('month-selector-log'), mStamp = document.getElementById('month-selector-stamp');
+            const years = []; for(let i = 2020; i <= new Date().getFullYear() + 16; i++) years.push(i);
+            years.reverse(); 
+            if(yLog && yStamp) [yLog, yStamp].forEach(sel => { if(sel) { sel.innerHTML = ""; years.forEach(y => sel.add(new Option(`${y}年`, y))); sel.value = selectedYear; } });
+            if(mLog && mStamp) [mLog, mStamp].forEach(sel => { if(sel) { sel.innerHTML = ""; for(let i=1; i<=12; i++) sel.add(new Option(`${i}月`, i)); sel.value = selectedMonth; } });
+        }
+
+        function syncDateAndRender(val, type) {
+            if (type === 'year') { selectedYear = parseInt(val); if(document.getElementById('year-selector-log')) document.getElementById('year-selector-log').value = val; if(document.getElementById('year-selector-stamp')) document.getElementById('year-selector-stamp').value = val; }
+            else { selectedMonth = parseInt(val); if(document.getElementById('month-selector-log')) document.getElementById('month-selector-log').value = val; if(document.getElementById('month-selector-stamp')) document.getElementById('month-selector-stamp').value = val; }
+            renderAll();
+        }
+
+        function renderAll() { 
+            if (!Array.isArray(logs)) logs = []; 
+            renderChokinBako(); 
+            renderStampPage(); 
+            renderBookList(); 
+        }
+
+        function getFiscalYear(date) {
+            return date.getMonth() < 3 ? date.getFullYear() - 1 : date.getFullYear();
+        }
+
+        function renderChokinBako() {
+            const tbc = document.getElementById('total-books-count'), tpr = document.getElementById('total-price-count'), tpa = document.getElementById('total-pages-count');
+            const filterPeriod = document.getElementById('filter-period') ? document.getElementById('filter-period').value : 'all';
+            
+            // ユーザーでフィルタリング
+            let userLogs = logs.filter(log => log.ownerId === currentUserId);
+
+            // 期間でフィルタリング
+            let filteredLogs = userLogs;
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth(); 
+            const currentFiscalYear = getFiscalYear(now);
+
+            if (filterPeriod === 'year') {
+                filteredLogs = userLogs.filter(log => {
+                    const d = new Date(log.timestamp || log.date);
+                    return getFiscalYear(d) === currentFiscalYear;
+                });
+            } else if (filterPeriod === 'month') {
+                filteredLogs = userLogs.filter(log => {
+                    const d = new Date(log.timestamp || log.date);
+                    return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+                });
+            }
+
+            if (tbc) tbc.innerText = filteredLogs.length;
+            if (tpr) tpr.innerText = filteredLogs.reduce((s, b) => s + (parseInt(b.price) || 0), 0).toLocaleString();
+            if (tpa) tpa.innerText = filteredLogs.reduce((s, b) => s + (parseInt(b.pages) || 0), 0).toLocaleString();
+        }
+
+        function renderStampPage() {
+            // 目標もユーザーごとに分ける必要がある。キーを `userId-year-month` にする
+            // 互換性のため、userIdがないキー(yyyy-mm)は読み込み時に userId=1 のものとして扱う処理が必要だが、
+            // ここでは表示時にキー生成を工夫する
+            const key = `${currentUserId}-${selectedYear}-${selectedMonth}`;
+            // 古いデータ形式のキーも確認（ID=1の場合のみ）
+            const legacyKey = `${selectedYear}-${selectedMonth}`;
+            
+            let goal = goals[key];
+            if (goal === undefined && currentUserId === 1) {
+                goal = goals[legacyKey]; // 古いデータがあればそれを使う
+            }
+            if (!goal) goal = 10; // デフォルト
+
+            const countText = document.getElementById('stamp-count-text'), progress = document.getElementById('goal-progress'), grid = document.getElementById('stamp-grid');
+            const targetEl = document.getElementById('target-goal-input'), headEl = document.getElementById('stamp-month-header');
+            if(targetEl) targetEl.value = goal;
+            if(headEl) headEl.innerText = `${selectedYear}年 ${selectedMonth}月`;
+            
+            // ユーザーごとの月間ログ
+            const monthlyLogs = logs.filter(l => { 
+                if (l.ownerId !== currentUserId) return false;
+                const d = new Date(l.timestamp || l.date); 
+                return d.getFullYear() === selectedYear && d.getMonth() + 1 === selectedMonth; 
+            });
+            const count = monthlyLogs.length;
+            if (countText) countText.innerText = `${count} / ${goal}`;
+            
+            if (count >= goal) {
+                progress.className = "h-full transition-all duration-700 progress-gold";
+            } else {
+                progress.className = "bg-gradient-to-r from-[#FFAB91] to-[#FF7043] h-full transition-all duration-700";
+            }
+            if (progress) progress.style.width = Math.min(100, (count / goal) * 100) + "%";
+            
+            // スタンプ設定の適用
+            const options = STAMP_OPTIONS[selectedMonth] || ["💮", "👍", "✨"];
+            const savedStamp = stampSettings[key] || options[0];
+
+            const selectEl = document.getElementById('stamp-type-select');
+            if(selectEl) {
+                selectEl.innerHTML = options.map(s => `<option value="${s}" ${s === savedStamp ? 'selected' : ''}>${s}</option>`).join('');
+            }
+
+            let maxVal = Math.max(30, goal, count);
+            let totalCells = Math.ceil(maxVal / 5) * 5; // 5列計算
+
+            if (grid) { 
+                grid.innerHTML = ""; 
+                const icon = savedStamp; 
+                for (let i = 0; i < totalCells; i++) { 
+                    const cell = document.createElement('div'); 
+                    cell.className = "stamp-cell" + (i < count ? " filled" : ""); 
+                    if (i < count) cell.innerText = icon; 
+                    grid.appendChild(cell); 
+                } 
+            }
+        }
+
+        function saveStampSetting(val) {
+            const key = `${currentUserId}-${selectedYear}-${selectedMonth}`;
+            stampSettings[key] = val;
+            localStorage.setItem(STORAGE_KEY_STAMP_SETTINGS, JSON.stringify(stampSettings));
+            renderStampPage(); 
+        }
+
+        // --- 感想メモ更新 ---
+        function updateMemo(id, text) {
+            logs = logs.map(b => b.id === id ? {...b, memo: text} : b);
+            localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(logs));
+        }
+
+        // --- 音声入力 ---
+        function startVoiceInput(id, btnElement) {
+            if(event) event.stopPropagation();
+
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('このスマホでは おんせいにゅうりょく が つかえません');
+                return;
+            }
+            
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'ja-JP';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            const originalText = btnElement.innerText;
+            btnElement.innerText = "👂";
+            btnElement.classList.add("bg-red-500", "animate-pulse");
+            btnElement.classList.remove("bg-blue-400");
+
+            recognition.start();
+
+            recognition.onresult = (event) => {
+                const text = event.results[0][0].transcript;
+                const textarea = btnElement.previousElementSibling;
+                if (textarea) {
+                    textarea.value = text;
+                    updateMemo(id, text);
+                }
+            };
+
+            const resetBtn = () => {
+                btnElement.innerText = "🎤";
+                btnElement.classList.remove("bg-red-500", "animate-pulse");
+                btnElement.classList.add("bg-blue-400");
+            };
+
+            recognition.onend = resetBtn;
+            recognition.onerror = resetBtn;
+        }
+
+        // --- リスト描画 ---
+        function renderBookList() {
+            const list = document.getElementById('book-list'), headEl = document.getElementById('log-month-header');
+            if(headEl) headEl.innerText = `${selectedYear}年 ${selectedMonth}月`;
+            
+            const monthlyLogs = logs.filter(l => { 
+                if (l.ownerId !== currentUserId) return false;
+                const d = new Date(l.timestamp || l.date); 
+                return d.getFullYear() === selectedYear && d.getMonth() + 1 === selectedMonth; 
+            });
+
+            if (document.getElementById('log-monthly-books')) document.getElementById('log-monthly-books').innerText = monthlyLogs.length;
+            if (!list) return;
+            if (monthlyLogs.length === 0) { list.innerHTML = `<div class="py-14 text-gray-400 font-bold text-sm text-center">📚 この月のきろくはありません</div>`; return; }
+            
+            list.innerHTML = monthlyLogs.map(book => `
+                <div class="bg-white p-3 rounded-xl shadow-md border-2 border-orange-200 flex flex-col gap-2 mb-3 relative text-left">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex-1 min-w-0 text-left">
+                            <div class="flex items-start gap-2 mb-1.5">
+                                <span class="text-[10px] font-black px-2 py-0.5 bg-[#FFDEE9] text-[#FF6B6B] rounded-full shrink-0 mt-0.5">${book.date.split('/')[2]}日</span>
+                                <div class="font-black text-[#4E342E] text-[13px] leading-snug break-words flex-1">${book.title}</div>
+                            </div>
+                            <div class="flex items-center gap-2 text-[11px] text-gray-500 pl-1">
+                                <div class="truncate flex-1">${book.author}</div>
+                                <div class="text-[#29B6F6] font-black whitespace-nowrap">${book.pages}p / ${book.price}円</div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end gap-2 shrink-0 text-left mt-0.5">
+                            <button type="button" onclick="deleteEntry(${book.id})" class="text-gray-300 text-sm p-1 font-bold hover:text-red-400 transition-colors">❌</button>
+                            <div class="flex gap-0.5 text-left">${[1, 2, 3, 4, 5].map(star => `<button type="button" onclick="updateRating(${book.id}, ${star})" class="text-base ${star <= (book.rating || 0) ? 'text-[#FFB800]' : 'text-gray-200'}">★</button>`).join('')}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 感想・音声入力エリア -->
+                    <div class="mt-1 pt-2 border-t border-orange-100">
+                        <div class="flex gap-2 items-start">
+                            <textarea 
+                                class="w-full text-xs p-2 border border-orange-200 rounded-lg bg-orange-50 focus:bg-white focus:border-orange-400 outline-none resize-none font-bold text-[#5D4037]" 
+                                rows="2" 
+                                placeholder="かんそうを いれてね"
+                                onchange="updateMemo(${book.id}, this.value)">${book.memo || ''}</textarea>
+                            <button type="button" onclick="startVoiceInput(${book.id}, this)" class="p-2 bg-blue-400 text-white rounded-lg shadow-sm active:scale-95 shrink-0 transition-colors">
+                                🎤
+                            </button>
+                        </div>
+                    </div>
+                </div>`).join('');
+        }
+
+        function showNotice(msg) {
+            const bar = document.getElementById('notice-msg');
+            if(!bar) return;
+            bar.innerText = msg; bar.classList.add('show');
+            setTimeout(() => bar.classList.remove('show'), 3000);
+        }
+
+        function showListHelp() { document.getElementById('list-help-modal').classList.remove('hidden'); }
+        function hideListHelp() { document.getElementById('list-help-modal').classList.add('hidden'); }
+
+        // --- データ操作（コピー・保存・復元・削除・リセット） ---
+        function copyForSpreadsheet() {
+            // 現在表示中のユーザーのデータのみコピーする仕様にする
+            const userLogs = logs.filter(l => l.ownerId === currentUserId);
+            if (!userLogs || userLogs.length === 0) { showNotice("きろくが ありません"); return; }
+            let tsv = "日付\tタイトル\tかいた人\t星\tメモ\tページ数\tごうけいページ\tきんがく\tごうけいきんがく\n";
+            let runningPages = 0, runningPrice = 0;
+            [...userLogs].reverse().forEach(b => {
+                const p = parseInt(b.pages) || 0, pr = parseInt(b.price) || 0;
+                runningPages += p; runningPrice += pr;
+                const memoText = b.memo ? b.memo.replace(/\n/g, ' ') : ""; 
+                tsv += `${b.date}\t${b.title}\t${b.author}\t${"⭐".repeat(b.rating || 0)}\t${memoText}\t${p}\t${runningPages}\t${pr}\t${runningPrice}\n`;
+            });
+            const ta = document.createElement("textarea");
+            ta.value = tsv; ta.style.position = "fixed"; ta.style.left = "-9999px"; ta.style.top = "0";
+            document.body.appendChild(ta); ta.select();
+            try {
+                if (document.execCommand('copy')) showNotice(`${userNames[currentUserId]}のデータをコピーしました`);
+                else showNotice("コピーにしっぱいしました");
+            } catch (err) { showNotice("コピーできませんでした"); }
+            document.body.removeChild(ta);
+        }
+
+        function saveDataFile() {
+            if (!logs || logs.length === 0) { showNotice("きろくが ありません"); return; }
+            try {
+                const data = { logs, goals, userNames, version: "v2", date: new Date().toISOString() };
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = `どくしょのきろく_${new Date().toLocaleDateString('ja-JP').replace(/\//g,'-')}.json`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                showNotice("バックアップしました！");
+            } catch(e) { showNotice("ほぞんに しっぱいしました"); }
+        }
+
+        function loadDataFile(input) {
+            const f = input.files[0]; if (!f) return;
+            const r = new FileReader();
+            r.onload = (e) => {
+                try {
+                    const d = JSON.parse(e.target.result);
+                    if (d.logs && Array.isArray(d.logs)) {
+                        logs = d.logs; goals = d.goals || {};
+                        if (d.userNames) userNames = d.userNames;
+                        logs.forEach(l => { if (!l.ownerId) l.ownerId = 1; });
+                        localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(logs));
+                        localStorage.setItem(STORAGE_KEY_GOALS, JSON.stringify(goals));
+                        localStorage.setItem(STORAGE_KEY_USER_NAMES, JSON.stringify(userNames));
+                        renderUserTabs();
+                        renderAll(); 
+                        showNotice("復元しました！");
+                    } else { showNotice("データのかたちが ちがいます"); }
+                } catch (err) { showNotice("しっぱいしました"); }
+            };
+            r.readAsText(f); input.value = "";
+        }
+
+        function deleteEntry(id) { if (confirm("この きろくを けしても いいですか？")) { logs = logs.filter(b => b.id !== id); localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(logs)); renderAll(); showNotice("けしました"); } }
+        function showResetConfirm() { document.getElementById('reset-confirm-modal').classList.remove('hidden'); }
+        function hideResetConfirm() { document.getElementById('reset-confirm-modal').classList.add('hidden'); }
+        function resetAllDataActual() { 
+            logs = logs.filter(l => l.ownerId !== currentUserId);
+            localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(logs));
+            renderAll(); hideResetConfirm(); showNotice(`${userNames[currentUserId]}のデータをリセットしました`); 
+        }
+
+        function updateGoal(val) { 
+            const key = `${currentUserId}-${selectedYear}-${selectedMonth}`; 
+            goals[key] = parseInt(val) || 10; 
+            localStorage.setItem(STORAGE_KEY_GOALS, JSON.stringify(goals)); 
+            renderAll(); 
+        }
+        
+        function switchTab(tab) { document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active')); const tabEl = document.getElementById('tab-' + tab), navEl = document.getElementById('nav-' + tab); if(tabEl) tabEl.classList.add('active'); if(navEl) navEl.classList.add('active'); if (tab !== 'home') stopScanner(); renderAll(); }
+
+        // --- 検索・登録関連 ---
+        async function searchBookData(isbn) {
+            const la = document.getElementById('search-candidates');
+            la.innerHTML = `<div class="py-4 text-xs text-gray-500 font-black animate-pulse text-center">しらべています...</div>`;
+            
+            let res = { title: "", author: "", price: "" };
+            let pageCandidates = [];
+            let priceCandidates = [];
+
+            const fGoogle = fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`).then(r => r.json()).then(data => {
+                if (data.items && data.items.length > 0) {
+                    const info = data.items[0].volumeInfo;
+                    res.title = info.title || "";
+                    res.author = cleanAuthorName(info.authors?.join(' ') || "");
+                    if (info.pageCount) pageCandidates.push(parseInt(info.pageCount));
+                    if (data.items[0].saleInfo?.listPrice) priceCandidates.push(extractCleanNum(data.items[0].saleInfo.listPrice.amount));
+                    if (info.description) {
+                        pageCandidates = pageCandidates.concat(scanPageNumsDeeply(info.description));
+                        priceCandidates = priceCandidates.concat(scanPriceDeeply(info.description));
+                    }
+                }
+            }).catch(() => {});
+
+            const fOpenBD = fetch(`https://api.openbd.jp/v1/get?isbn=${isbn}`).then(r => r.json()).then(data => {
+                if (data && data[0]) {
+                    const b = data[0].summary, onix = data[0].onix;
+                    if (!res.title) res.title = b.title || "";
+                    if (!res.author) res.author = cleanAuthorName(b.author || "");
+                    if (b.pages) pageCandidates.push(extractCleanNum(b.pages));
+                    try {
+                        const extents = findValuesByKey(onix, 'Extent');
+                        if(extents.length > 0) {
+                            const pageVals = findValuesByKey(onix, 'ExtentValue');
+                            pageVals.forEach(v => pageCandidates.push(extractCleanNum(v)));
+                        }
+                        const priceAmounts = findValuesByKey(onix, 'PriceAmount');
+                        priceAmounts.forEach(v => priceCandidates.push(extractCleanNum(v)));
+                    } catch(e) {}
+                }
+            }).catch(() => {});
+
+            const fNDL = fetch(`https://ndlsearch.ndl.go.jp/api/opensearch?isbn=${isbn}`).then(async r => {
+                const txt = await r.text();
+                const titleMatch = txt.match(/<dc:title>([^<]+)<\/dc:title>/) || txt.match(/<title>([^<]+)<\/title>/);
+                if(titleMatch && !res.title) res.title = titleMatch[1];
+                const creatorMatch = txt.match(/<dc:creator>([^<]+)<\/dc:creator>/) || txt.match(/<author>([^<]+)<\/author>/);
+                if(creatorMatch && !res.author) res.author = cleanAuthorName(creatorMatch[1]);
+                const priceMatch = txt.match(/<dcndl:price>([^<]+)<\/dcndl:price>/) || txt.match(/<price>([^<]+)<\/price>/);
+                if(priceMatch) priceCandidates.push(extractCleanNum(priceMatch[1]));
+                const extentMatch = txt.match(/<dcterms:extent>([^<]+)<\/dcterms:extent>/);
+                if(extentMatch) pageCandidates = pageCandidates.concat(scanPageNumsDeeply(extentMatch[1]));
+                const descMatches = txt.matchAll(/<dc:description>([^<]+)<\/dc:description>/g);
+                for (const m of descMatches) {
+                    pageCandidates = pageCandidates.concat(scanPageNumsDeeply(m[1]));
+                    priceCandidates = priceCandidates.concat(scanPriceDeeply(m[1]));
+                }
+                priceCandidates = priceCandidates.concat(scanPriceDeeply(txt));
+                pageCandidates = pageCandidates.concat(scanPageNumsDeeply(txt));
+            }).catch(() => {});
+
+            await Promise.allSettled([fGoogle, fOpenBD, fNDL]);
+
+            const validPages = pageCandidates.filter(n => !isNaN(n) && n > 0).sort((a, b) => b - a);
+            const validPrices = priceCandidates.filter(n => !isNaN(n) && n > 0).sort((a, b) => b - a);
+            const likelyPages = validPages.filter(p => p > 8);
+            let finalPages = likelyPages.length > 0 ? likelyPages[0].toString() : (validPages.length > 0 ? validPages[0].toString() : "");
+            let finalPrice = validPrices.length > 0 ? validPrices[0].toString() : "";
+            
+            const missing = [];
+            if (!res.title) missing.push('input-title');
+            if (!finalPages) missing.push('input-pages');
+            if (!finalPrice) missing.push('input-price');
+
+            if (res.title) {
+                la.innerHTML = `<div onclick="applyToForm('${res.title.replace(/'/g,"\\'")}', '${res.author.replace(/'/g,"\\'")}', '${finalPages}', '${finalPrice}')" class="p-3 bg-blue-50 border-2 border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 text-left">
+                    <span class="text-[9px] bg-blue-500 text-white px-2 py-0.5 rounded-full">みつけた！</span>
+                    <p class="text-sm font-black text-gray-800 line-clamp-1 mt-1">${res.title}</p>
+                    ${missing.length > 0 ? '<p class="text-[10px] text-red-500 font-bold mt-1">※たりない ところは 入力してね</p>' : ''}
+                </div>`;
+                applyToForm(res.title, res.author, finalPages, finalPrice);
+                if (!finalPages) document.getElementById('input-pages').classList.add('input-error');
+                if (!finalPrice) document.getElementById('input-price').classList.add('input-error');
+            } else {
+                la.innerHTML = `<p class="py-4 text-xs text-gray-400 font-black text-center text-left">みつかりませんでした。</p>`;
+                applyToForm("", "", "", "");
+            }
+        }
+
+        function findValuesByKey(obj, keyToFind) {
+            let results = [];
+            if (!obj || typeof obj !== 'object') return results;
+            if (Array.isArray(obj)) { obj.forEach(item => { results = results.concat(findValuesByKey(item, keyToFind)); }); } 
+            else { Object.keys(obj).forEach(key => { if (key === keyToFind) { results.push(obj[key]); } results = results.concat(findValuesByKey(obj[key], keyToFind)); }); }
+            return results;
+        }
+
+        function extractCleanNum(v) { 
+            if(!v) return 0;
+            let s = v.toString().replace(/[０-９]/g, m => String.fromCharCode(m.charCodeAt(0) - 0xFEE0));
+            s = s.replace(/,/g, '');
+            const match = s.match(/\d+/);
+            return match ? parseInt(match[0]) : 0;
+        }
+
+        function scanPageNumsDeeply(t) { 
+            if(!t) return [];
+            const text = t.replace(/[０-９]/g, m => String.fromCharCode(m.charCodeAt(0) - 0xFEE0));
+            const results = [];
+            const regex1 = /(\d{1,4})\s*(?:p|ページ|頁|枚|p\.)(?!\s*(?:cm|mm|kg|g|%))/gi;
+            let match;
+            while ((match = regex1.exec(text)) !== null) { const num = parseInt(match[1]); if (!isNaN(num)) results.push(num); }
+            const regex2 = /(?:ページ|p|page|Pages)[:：\s]*(\d{1,4})/gi;
+            while ((match = regex2.exec(text)) !== null) { const num = parseInt(match[1]); if (!isNaN(num)) results.push(num); }
+            return results;
+        }
+
+        function scanPriceDeeply(t) {
+            if(!t) return [];
+            const text = t.replace(/[０-９]/g, m => String.fromCharCode(m.charCodeAt(0) - 0xFEE0));
+            const regex = /(?:定価|本体|価格|￥|¥|\\)\s*([0-9,]+)|([0-9,]+)(?:円|JPY)/gi;
+            let match;
+            const results = [];
+            while ((match = regex.exec(text)) !== null) {
+                const valStr = match[1] || match[2];
+                if(valStr) { const num = parseInt(valStr.replace(/,/g, '')); if (!isNaN(num) && num > 0) results.push(num); }
+            }
+            return results;
+        }
+        
+        function cleanAuthorName(s) { 
+            if (!s) return ""; 
+            let c = s.replace(/(\d{4}\s*-\s*\d{4}|\d{4}\s*-\s*|\s*-\s*\d{4})/g, '').replace(/[著編訳]|監修|ほか|イラスト/g, '').replace(/[／,，、．.\[\]\(\)（）]/g, ' ').trim(); 
+            let p = [...new Set(c.split(/\s+/).filter(x => x.length > 0))]; 
+            return p.filter(x => !p.some(o => o !== x && o.includes(x))).join(' ').trim(); 
+        }
+
+        function applyToForm(t, a, p, pr) { 
+            document.getElementById('input-title').value = t || ""; 
+            document.getElementById('input-author').value = a || ""; 
+            document.getElementById('input-pages').value = p || ""; 
+            document.getElementById('input-price').value = pr || "";
+            ['input-title', 'input-pages', 'input-price'].forEach(id => document.getElementById(id).classList.remove('input-error'));
+        }
+
+        function showManualModal(isbn = "") { 
+            document.getElementById('modal-overlay').classList.remove('hidden'); 
+            if(document.getElementById('input-isbn')) document.getElementById('input-isbn').value = isbn;
+            document.getElementById('input-title').value = "";
+            document.getElementById('input-author').value = "";
+            document.getElementById('input-pages').value = "";
+            document.getElementById('input-price').value = "";
+            document.getElementById('search-candidates').innerHTML = "";
+            ['input-pages', 'input-price'].forEach(id => document.getElementById(id).classList.remove('input-error'));
+
+            const btnContainer = document.getElementById('record-buttons-container');
+            btnContainer.innerHTML = [1, 2, 3].map(id => `
+                <button onclick="manualAddBook(${id})" class="flex-1 py-2 bg-[#29B6F6] text-white rounded-xl shadow active:scale-95 border-b-4 border-[#0277BD] flex flex-col items-center justify-center leading-tight h-14">
+                    <span class="text-xs font-black truncate w-full px-1 text-center">${userNames[id]}</span>
+                    <span class="text-[9px] font-bold">にきろく！</span>
+                </button>
+            `).join('');
+        }
+
+        function hideManualModal() { document.getElementById('modal-overlay').classList.add('hidden'); isProcessingBarcode = false; }
+        function lookupISBNFromInput() { const v = document.getElementById('input-isbn').value.trim().replace(/[^0-9]/g, ''); if (v.length >= 10) searchBookData(v); }
+
+        function toggleScanner() { isScannerRunning ? stopScanner() : startScanner(); }
+        function stopScanner() {
+            isScannerRunning = false; isProcessingBarcode = false;
+            try { if(typeof Quagga !== 'undefined') Quagga.stop(); } catch(e) {}
+            document.querySelectorAll('video').forEach(v => { if (v.srcObject) v.srcObject.getTracks().forEach(t => t.stop()); v.remove(); });
+            const sc = document.getElementById('scanner-cover'); if(sc) sc.classList.remove('hidden');
+            const gb = document.getElementById('guide-box'); if(gb) gb.classList.add('hidden');
+            const so = document.getElementById('success-overlay'); if(so) so.style.display = "none";
+            const swBtn = document.getElementById('cam-switch-btn'); if(swBtn) swBtn.classList.add('hidden');
+            const btn = document.getElementById('btn-text'); if(btn) btn.innerText = "カメラでバーコードをよむ";
+            const canvas = document.querySelector('#interactive canvas'); if (canvas) canvas.remove();
+        }
+        async function startScanner() {
+            if (isScannerRunning || typeof Quagga === 'undefined') return;
+            const btn = document.getElementById('btn-text'); if(btn) btn.innerText = "カメラをとめる";
+            const swBtn = document.getElementById('cam-switch-btn'); if(swBtn) swBtn.classList.remove('hidden');
+            try {
+                playStartSound(); 
+                Quagga.init({
+                    inputStream: { name: "Live", type: "LiveStream", target: document.querySelector('#interactive'), constraints: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } }, area: { top: "10%", bottom: "10%" } },
+                    decoder: { readers: ["ean_reader"] }, frequency: 10, numOfWorkers: 2, locator: { patchSize: "medium", halfSample: true }
+                }, (err) => {
+                    if (err) { stopScanner(); showNotice("カメラが使えません。"); return; }
+                    Quagga.start(); isScannerRunning = true; 
+                    document.getElementById('scanner-cover').classList.add('hidden');
+                    document.getElementById('guide-box').classList.remove('hidden');
+                });
+            } catch (e) { stopScanner(); }
+        }
+        
+        function switchCamera() {
+            currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
+            if (isScannerRunning) { stopScanner(); setTimeout(() => { startScanner(); }, 300); }
+            showNotice(currentFacingMode === "environment" ? "外側のカメラにします" : "自分側のカメラにします");
+        }
+
+        if(typeof Quagga !== 'undefined') {
+            Quagga.onDetected(data => { 
+                const code = data.codeResult.code; 
+                if (!code || typeof code !== 'string') return;
+                const trimmedCode = code.trim();
+                if (trimmedCode.length !== 13 || !trimmedCode.startsWith('978')) return;
+
+                if (isProcessingBarcode) return;
+                isProcessingBarcode = true; 
+
+                try {
+                    const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                    osc.frequency.setValueAtTime(1320, audioCtx.currentTime); gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                    osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+                } catch(e){}
+                document.getElementById('success-overlay').style.display = "flex"; 
+                setTimeout(() => { showManualModal(trimmedCode); searchBookData(trimmedCode); stopScanner(); }, 200); 
+            });
+        }
+
+        function checkGoalAchievement() {
+            const modal = document.getElementById('goal-achieved-modal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                try {
+                    if (typeof confetti !== 'undefined') {
+                        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                        setTimeout(() => { confetti({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0 } }); confetti({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1 } }); }, 500);
+                    }
+                    playFanfare();
+                } catch(e) {}
+            }
+        }
+
+        function manualAddBook(targetUserId = currentUserId) {
+            const t = document.getElementById('input-title').value.trim(), p = document.getElementById('input-pages').value.trim(), pr = document.getElementById('input-price').value.trim(), a = document.getElementById('input-author').value.trim();
+            if(!t) { showNotice("なまえを いれてね"); return; }
+            if(!p || p === "0" || !pr || pr === "0") { 
+                showNotice("あいているところを かいてね");
+                if(!p || p==="0") document.getElementById('input-pages').classList.add('input-error');
+                if(!pr || pr==="0") document.getElementById('input-price').classList.add('input-error');
+                return; 
+            }
+            const now = new Date();
+            const recordDate = new Date(selectedYear, selectedMonth - 1, now.getDate());
+
+            // ユーザーIDを付与して保存
+            logs.unshift({ 
+                id: Date.now(), 
+                title: t, 
+                author: a || "ふめい", 
+                pages: p, 
+                price: pr, 
+                rating: 0, 
+                date: recordDate.toLocaleDateString('ja-JP'), 
+                timestamp: recordDate.getTime(),
+                ownerId: targetUserId,
+                memo: ""
+            });
+            localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(logs)); 
+            
+            // 記録したユーザーのタブに切り替える
+            if (targetUserId !== currentUserId) {
+                switchUser(targetUserId);
+            } else {
+                renderAll();
+            }
+            
+            playFanfare(); 
+            hideManualModal();
+
+            // 目標達成チェック
+            const key = `${targetUserId}-${selectedYear}-${selectedMonth}`;
+            let goal = goals[key] || 10;
+            if (targetUserId === 1 && goals[key] === undefined && goals[`${selectedYear}-${selectedMonth}`]) {
+                goal = goals[`${selectedYear}-${selectedMonth}`];
+            }
+
+            const monthlyLogs = logs.filter(l => { 
+                if (l.ownerId !== targetUserId) return false;
+                const d = new Date(l.timestamp || l.date); 
+                return d.getFullYear() === selectedYear && d.getMonth() + 1 === selectedMonth; 
+            });
+
+            if (monthlyLogs.length === goal) { 
+                 checkGoalAchievement(); 
+            } else {
+                 const cl = document.getElementById('celebration'); if(cl) { cl.classList.remove('hidden'); setTimeout(() => cl.classList.add('hidden'), 2500); } 
+            }
+        }
+        
+        function updateRating(id, r) { 
+            logs = logs.map(b => b.id === id ? {...b, rating: r} : b); 
+            localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(logs)); 
+            renderAll(); 
+        }
+        
+        function showHelp() { document.getElementById('help-modal').classList.remove('hidden'); }
+        function hideHelp() { document.getElementById('help-modal').classList.add('hidden'); }
+    </script>
+</body>
+</html>
